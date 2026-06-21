@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.vite/
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+city-heist-source.tar.gz
