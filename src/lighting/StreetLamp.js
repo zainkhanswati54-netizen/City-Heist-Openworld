@@ -1,37 +1,57 @@
 import * as THREE from 'three';
-import { standardMaterial, emissiveMaterial } from '../utils/MaterialFactory.js';
-import { PALETTE } from '../config/colors.js';
 
+// Warm sodium-vapour street lamp — no shadows (disabled globally).
+// Uses MeshBasicMaterial on the bulb so it glows even without lights.
 export class StreetLamp {
   constructor(x, z) {
     this.group = new THREE.Group();
 
-    const poleMat = standardMaterial(0x2a2a2e, { metalness: 0.6, roughness: 0.4 });
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 4.2, 8), poleMat);
-    pole.position.y = 2.1;
-    pole.castShadow = true;
+    // ── Pole ─────────────────────────────────────────────────────────────
+    const poleMat = new THREE.MeshLambertMaterial({ color: 0x282830 });
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 5.0, 6), poleMat);
+    pole.position.y = 2.5;
     this.group.add(pole);
 
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.8, 6), poleMat);
-    arm.rotation.z = Math.PI / 2.4;
-    arm.position.set(0.3, 4.05, 0);
+    // ── Arm ──────────────────────────────────────────────────────────────
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 5), poleMat);
+    arm.rotation.z = Math.PI / 2.2;
+    arm.position.set(0.38, 4.9, 0);
     this.group.add(arm);
 
-    const bulbMat = emissiveMaterial(PALETTE.lampGlowDay, 0.6);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), bulbMat);
-    bulb.position.set(0.6, 3.95, 0);
-    this.group.add(bulb);
-    this.bulbMat = bulbMat;
+    // ── Lamphead housing ─────────────────────────────────────────────────
+    const headMat = new THREE.MeshLambertMaterial({ color: 0x1a1a22 });
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.25, 0.5), headMat);
+    head.position.set(0.72, 4.76, 0);
+    this.group.add(head);
 
-    this.light = new THREE.PointLight(PALETTE.lampGlowNight, 0, 9, 2);
-    this.light.position.set(0.6, 3.9, 0);
-    this.group.add(this.light);
+    // ── Glowing bulb (always visible, no lighting needed) ────────────────
+    this._bulbMat = new THREE.MeshBasicMaterial({ color: 0xffddaa });
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), this._bulbMat);
+    bulb.position.set(0.72, 4.60, 0);
+    this.group.add(bulb);
+
+    // ── Point light — warm orange-white sodium colour ─────────────────────
+    this._light = new THREE.PointLight(0xffcc88, 0, 16, 1.8);
+    this._light.position.set(0.72, 4.55, 0);
+    this.group.add(this._light);
+
+    // ── Ground halo (optional: small emissive circle on ground) ──────────
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: 0xffbb66, transparent: true, opacity: 0, side: THREE.FrontSide,
+      depthWrite: false
+    });
+    this._haloMesh = new THREE.Mesh(new THREE.CircleGeometry(3.0, 12), haloMat);
+    this._haloMesh.rotation.x = -Math.PI / 2;
+    this._haloMesh.position.y = 0.05;
+    this.group.add(this._haloMesh);
+    this._haloMat = haloMat;
 
     this.group.position.set(x, 0, z);
   }
 
   setNight(isNight) {
-    this.light.intensity = isNight ? 1.4 : 0;
-    this.bulbMat.emissiveIntensity = isNight ? 1.8 : 0.3;
+    this._light.intensity     = isNight ? 2.4 : 0;
+    this._bulbMat.color.setHex(isNight ? 0xffcc44 : 0x888870);
+    this._haloMat.opacity     = isNight ? 0.09 : 0;
   }
 }

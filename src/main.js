@@ -53,6 +53,7 @@ import { WeaponSoundKit } from './audio/WeaponSoundKit.js';
 import { AmbientNatureSound } from './audio/AmbientNatureSound.js';
 import { CityMusicPlayer } from './audio/CityMusicPlayer.js';
 import { CityAmbientSounds } from './audio/CityAmbientSounds.js';
+import { TrafficAmbientHum } from './audio/TrafficAmbientHum.js';
 
 import { MissionSystem } from './gameplay/MissionSystem.js';
 
@@ -191,8 +192,9 @@ async function boot() {
   const engineSound    = new ProceduralEngineLayer(audio);
   const weaponSoundKit = new WeaponSoundKit(audio);
   const ambientSound   = new AmbientNatureSound(audio);
-  const cityMusic      = new CityMusicPlayer(audio);
   const cityAmbient    = new CityAmbientSounds(audio);
+  const trafficHum     = new TrafficAmbientHum(audio);
+  // CityMusicPlayer intentionally NOT started in-game — music plays on loading screen only
 
   loading.setProgress(100, 'City Heist is ready!');
   await frame();
@@ -206,8 +208,9 @@ async function boot() {
     audioStarted = true;
     audio.init();
     ambientSound.start();
-    cityMusic.start();
     cityAmbient.start();
+    trafficHum.start();
+    // cityMusic NOT started — user wants music in loading screen only
   }
 
   await new Promise(resolve => {
@@ -434,53 +437,28 @@ async function boot() {
   }
 
   // ── Main Loop ─────────────────────────────────────────────────────────
-  function animate() {
-    requestAnimationFrame(animate);
-    const dt = clock.tick();
+  // Target 30 fps — halves CPU/GPU workload vs uncapped on 60 Hz displays.
+  // On a slow phone this also prevents the browser from thermal-throttling.
+  const TARGET_MS = 1000 / 30;
+  let _lastFrameTime = 0;
+  let _frameCount    = 0;
 
+  function animate(now) {
+    requestAnimationFrame(animate);
+
+    // ── 30 fps cap ───────────────────────────────────────────────────────
+    if (now - _lastFrameTime < TARGET_MS) return;
+    _lastFrameTime = now;
+    _frameCount++;
+
+    const dt = clock.tick();
     if (buttonFix.isPaused()) { engine.render(); return; }
 
-    perf.trackFrame(dt);
+    // ── Always: input + player + camera ─────────────────────────────────
     applyTouchButtonFlags();
     if (!enterExit.inCar) applyTouchMovementOnFoot();
     tweenManager.update(dt);
-
     weaponRegistry.list().forEach(w => w.instance.update(dt));
-
-    dayNight.update(dt);
-    daySchedule.update(dayNight.t);
-
-    // Sky dome update — uses sun world position + cycle value
-    skyDome.update(sun.position, dayNight.cycle);
-
-    scheduleApplyTimer += dt;
-    if (daySchedule.periodChanged || scheduleApplyTimer >= SCHEDULE_APPLY_INTERVAL) {
-      scheduleApplyTimer = 0;
-      applyScheduleToPedestrians(pedestrians, daySchedule, hud);
-    }
-
-    city.update(dt, dayNight.isNight);
-
-    cars.forEach(car => {
-      if (car.inUse) return;
-      car.lights.setNight(dayNight.isNight);
-    });
-
-    const viewerPos  = enterExit.inCar ? enterExit.currentCar.group.position : player.group.position;
-    const vpx = viewerPos.x, vpz = viewerPos.z;
-
-    // ── Traffic: skip update + hide if far away ──────────────────────────
-    const trafficMult = daySchedule.trafficMultiplier;
-    trafficCars.forEach(tc => {
-      const dx = tc.group.position.x - vpx;
-      const dz = tc.group.position.z - vpz;
-      const inRange = (dx * dx + dz * dz) < TRAFFIC_UPDATE_DIST_SQ;
-      tc.group.visible = inRange;
-      if (inRange) tc.updateTraffic(dt, trafficMult);
-      tc.lights.setNight(dayNight.isNight);
-    });
-
-    perf.applyLOD(buildingLODItems, vpx, vpz);
 
     if (enterExit.inCar) {
       const controls = getCarControls();
@@ -498,9 +476,21 @@ async function boot() {
       playerCamera.follow(player.group.position);
     }
 
-    const targetPos = enterExit.inCar ? enterExit.currentCar.group.position : player.group.position;
+    // Key inputs — every frame so they're never missed
+    if (input.wasPressed('enterExitVehicle')) handleEnterExit();
+    if (input.wasPressed('toggleCameraView')) playerCamera.toggleView();
+    if (input.wasPressed('cycleWeapon'))      { weaponSelector.next(); refreshAmmoDisplay(); }
+    if (input.isDown('fire') && !enterExit.inCar) fireWeapon();
 
-    // Police update
+    updateBullets(dt);
+    muzzleFlash.update(dt);
+    impactParticles.update(dt);
+
+    const targetPos  = enterExit.inCar ? enterExit.currentCar.group.position : player.group.position;
+    const viewerPos  = targetPos;
+    const vpx = viewerPos.x, vpz = viewerPos.z;
+
+    // ── Every frame: police AI (they need to react quickly) ─────────────
     police.forEach((officer, idx) => {
       if (!officer.alive) return;
       const result = officer.ai.update(officer.group, targetPos, dt, gameState.wantedLevel);
@@ -516,48 +506,69 @@ async function boot() {
     });
     cleanupDeadPolice();
 
-    // ── NPC update: skip + hide if outside cull distance ────────────────
-    const period = daySchedule.period;
-    pedestrians.forEach(ped => {
-      const dx = ped.group.position.x - vpx;
-      const dz = ped.group.position.z - vpz;
-      const inRange = (dx * dx + dz * dz) < NPC_UPDATE_DIST_SQ;
-      ped.group.visible = inRange;
-      if (inRange && typeof ped.update === 'function') ped.update(dt, period);
-    });
+    // ── Every 2 frames: traffic (cars don't need 30 Hz AI) ──────────────
+    if (_frameCount % 2 === 0) {
+      const trafficMult = daySchedule.trafficMultiplier;
+      let nearTrafficCount = 0;
+      trafficCars.forEach(tc => {
+        const dx = tc.group.position.x - vpx;
+        const dz = tc.group.position.z - vpz;
+        const inRange = (dx * dx + dz * dz) < TRAFFIC_UPDATE_DIST_SQ;
+        tc.group.visible = inRange;
+        if (inRange) { tc.updateTraffic(dt * 2, trafficMult); nearTrafficCount++; }
+        tc.lights.setNight(dayNight.isNight);
+      });
+      trafficHum.update(nearTrafficCount);
+    }
 
-    talkingPairs.forEach(pair => {
-      const dx = pair.npcs[0].group.position.x - vpx;
-      const dz = pair.npcs[0].group.position.z - vpz;
-      if ((dx * dx + dz * dz) < NPC_UPDATE_DIST_SQ) pair.update(dt);
-    });
+    // ── Every 3 frames: pedestrians (slow walkers) ───────────────────────
+    if (_frameCount % 3 === 0) {
+      const period = daySchedule.period;
+      pedestrians.forEach(ped => {
+        const dx = ped.group.position.x - vpx;
+        const dz = ped.group.position.z - vpz;
+        const inRange = (dx * dx + dz * dz) < NPC_UPDATE_DIST_SQ;
+        ped.group.visible = inRange;
+        if (inRange && typeof ped.update === 'function') ped.update(dt * 3, period);
+      });
+      talkingPairs.forEach(pair => {
+        const dx = pair.npcs[0].group.position.x - vpx;
+        const dz = pair.npcs[0].group.position.z - vpz;
+        if ((dx * dx + dz * dz) < NPC_UPDATE_DIST_SQ) pair.update(dt * 3);
+      });
+      beachCrowd.forEach(b => {
+        const dx = b.group.position.x - vpx;
+        const dz = b.group.position.z - vpz;
+        if ((dx * dx + dz * dz) < NPC_UPDATE_DIST_SQ) b.update(dt * 3);
+      });
+      benchSitters.forEach(s => s.update(dt * 3));
+    }
 
-    benchSitters.forEach(s => s.update(dt));
-    beachCrowd.forEach(b => {
-      const dx = b.group.position.x - vpx;
-      const dz = b.group.position.z - vpz;
-      if ((dx * dx + dz * dz) < NPC_UPDATE_DIST_SQ) b.update(dt);
-    });
+    // ── Every 4 frames: sky + day-night (visual-only, no rush) ──────────
+    if (_frameCount % 4 === 0) {
+      dayNight.update(dt * 4);
+      daySchedule.update(dayNight.t);
+      skyDome.update(sun.position, dayNight.cycle);
+      city.update(dt * 4, dayNight.isNight);
+      cars.forEach(car => { if (!car.inUse) car.lights.setNight(dayNight.isNight); });
 
-    // Bullets, pickups, effects
-    updateBullets(dt);
-    muzzleFlash.update(dt);
-    impactParticles.update(dt);
-    updatePickups();
-    updateWantedResponse(dt);
+      scheduleApplyTimer += dt * 4;
+      if (daySchedule.periodChanged || scheduleApplyTimer >= SCHEDULE_APPLY_INTERVAL) {
+        scheduleApplyTimer = 0;
+        applyScheduleToPedestrians(pedestrians, daySchedule, hud);
+      }
+    }
 
-    // ── Missions ─────────────────────────────────────────────────────────
-    missionSystem.update(dt, targetPos);
-    if (missionSystem.isRunning) missionHUD.tick(missionSystem.timeLeft);
-
-    // Key inputs
-    if (input.wasPressed('enterExitVehicle')) handleEnterExit();
-    if (input.wasPressed('toggleCameraView')) playerCamera.toggleView();
-    if (input.wasPressed('cycleWeapon'))      { weaponSelector.next(); refreshAmmoDisplay(); }
-    if (input.isDown('fire') && !enterExit.inCar) fireWeapon();
-
-    const decayRate = 0.002 + Math.max(0, gameState.reputation) * 0.00005;
-    gameState.decayWanted(decayRate * dt);
+    // ── Every 6 frames: non-critical systems ────────────────────────────
+    if (_frameCount % 6 === 0) {
+      perf.applyLOD(buildingLODItems, vpx, vpz);
+      updatePickups();
+      updateWantedResponse(dt * 6);
+      const decayRate = 0.002 + Math.max(0, gameState.reputation) * 0.00005;
+      gameState.decayWanted(decayRate * dt * 6);
+      missionSystem.update(dt * 6, targetPos);
+      if (missionSystem.isRunning) missionHUD.tick(missionSystem.timeLeft);
+    }
 
     if (audioStarted && audio.ctx && audio.ctx.state === 'suspended') audio.resume();
 
