@@ -64,8 +64,10 @@ export class CityBuilder {
     this.cityBlocks = layout.blocks;
 
     this.scene.add(createGround());
+    this.windowGrid.addToScene(this.scene);
 
     const roads = new RoadNetwork();
+    this.roads = roads;
     const markings = new RoadMarkings();
     const sidewalks = new Sidewalk();
     const intersections = new Intersection();
@@ -150,22 +152,6 @@ export class CityBuilder {
         const tree = new Tree(block.x + w / 2 + 2, block.z - d / 2 - 2);
         this.scene.add(tree.group);
       }
-
-      // ── Extra small side-building (40 % of blocks) ──────────────────────
-      // Fills gaps between main buildings — makes city feel denser.
-      if (chance(0.40)) {
-        const sw = 4 + randInt(0, 4);
-        const sh = 3 + randInt(0, 6);
-        const sd = 4 + randInt(0, 4);
-        const side = Math.random() > 0.5 ? 1 : -1;
-        const sx = block.x + side * (w / 2 + sw / 2 + 1.5);
-        const sz = block.z + (Math.random() - 0.5) * 4;
-        const scolor = pick(PALETTE.buildingPalette);
-        const sb = new Building(sx, sz, sw, sh, sd, scolor);
-        this.nightLighting.attachToBuilding(sb.group, sw, sh, sd);
-        this.scene.add(sb.group);
-        this.buildings.push({ mesh: sb.group, x: sx, z: sz, w: sw, d: sd, h: sh });
-      }
     });
 
     STREET_PROP_SPAWNS.forEach(p => {
@@ -182,25 +168,7 @@ export class CityBuilder {
       if (obj) this.scene.add(obj);
     });
 
-    // ── Street lamps along every road at regular intervals ────────────────
-    const LAMP_SPACING = 18;
-    layout.roadsX.forEach(rx => {
-      for (let z = -layout.half; z <= layout.half; z += LAMP_SPACING) {
-        const lamp = new StreetLamp(rx + 7, z);
-        this.streetLamps.push(lamp);
-        this.scene.add(lamp.group);
-      }
-    });
-    layout.roadsZ.forEach(rz => {
-      for (let x = DISTRICT_LAYOUT.cityBounds.xMin; x <= layout.half; x += LAMP_SPACING) {
-        const lamp = new StreetLamp(x, rz + 7);
-        this.streetLamps.push(lamp);
-        this.scene.add(lamp.group);
-      }
-    });
-
-    // ── Extra scattered city lamps for ambience ───────────────────────────
-    for (let i = 0; i < 55; i++) {
+    for (let i = 0; i < 32; i++) {
       const x = DISTRICT_LAYOUT.cityBounds.xMin + Math.random() * (DISTRICT_LAYOUT.cityBounds.xMax - DISTRICT_LAYOUT.cityBounds.xMin);
       const z = DISTRICT_LAYOUT.cityBounds.zMin + Math.random() * (DISTRICT_LAYOUT.cityBounds.zMax - DISTRICT_LAYOUT.cityBounds.zMin);
       const lamp = new StreetLamp(x, z);
@@ -229,7 +197,7 @@ export class CityBuilder {
     this.streetLamps.forEach(lamp => lamp.setNight(isNight));
     this.nightLighting.setNight(isNight);
     if (isNight) this.nightLighting.flicker(dt);
-    this.districts.update(dt);
+    this.districts.update(dt, isNight);
     if (Math.random() < 0.01) this.windowGrid.flickerRandom();
   }
 

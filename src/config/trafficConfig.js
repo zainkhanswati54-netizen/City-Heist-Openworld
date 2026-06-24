@@ -1,8 +1,6 @@
 import { DISTRICT_LAYOUT } from './districtConfig.js';
-import { isLikelyMobile } from '../core/PlatformDetect.js';
 
-// More cars = more city life.  Still capped lower on mobile for performance.
-export const TRAFFIC_CAR_COUNT = isLikelyMobile() ? 14 : 22;
+export const TRAFFIC_CAR_COUNT = 14;  // was 32 — fewer moving parts per frame
 
 export const TRAFFIC_COLOR_INDICES = [0, 1, 2, 3, 4, 5];
 

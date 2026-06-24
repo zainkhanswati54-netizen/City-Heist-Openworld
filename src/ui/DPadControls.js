@@ -1,5 +1,7 @@
+import { makeIconButton, bindHoldButton, bindTapButton } from './TouchIcons.js';
+
 export class DPadControls {
-  constructor(root) {
+  constructor(root, onHorn) {
     this.state = {
       accel: false,
       brake: false,
@@ -7,6 +9,7 @@ export class DPadControls {
       right: false,
       handbrake: false
     };
+    this.onHorn = onHorn;
     this.container = document.createElement('div');
     this.container.style.cssText = 'position:absolute;inset:0;pointer-events:none;display:none;';
     root.appendChild(this.container);
@@ -14,57 +17,37 @@ export class DPadControls {
     this._buildSteering();
     this._buildPedals();
     this._buildHandbrake();
+    this._buildHorn();
   }
 
   show() { this.container.style.display = 'block'; }
   hide() { this.container.style.display = 'none'; }
 
-  _bind(el, key) {
-    const setTrue = e => { this.state[key] = true; if (e.cancelable) e.preventDefault(); };
-    const setFalse = () => { this.state[key] = false; };
-    el.addEventListener('touchstart', setTrue, { passive: false });
-    el.addEventListener('touchend', setFalse);
-    el.addEventListener('touchcancel', setFalse);
-    el.addEventListener('mousedown', setTrue);
-    el.addEventListener('mouseup', setFalse);
-    el.addEventListener('mouseleave', setFalse);
-  }
-
-  _makeBtn(label, extraStyle) {
-    const btn = document.createElement('div');
-    btn.textContent = label;
-    btn.style.cssText = `
-      position:absolute;width:62px;height:62px;border-radius:12px;
-      background:rgba(20,20,24,0.65);color:#fff;display:flex;align-items:center;justify-content:center;
-      font-family:monospace;font-size:20px;font-weight:bold;user-select:none;touch-action:none;
-      border:2px solid rgba(255,255,255,0.35);pointer-events:auto;
-      ${extraStyle}
-    `;
+  _addToggle(icon, style, key, bg) {
+    const btn = makeIconButton({ icon, size: 60, bg, extraStyle: style });
+    bindHoldButton(btn, () => { this.state[key] = true; }, () => { this.state[key] = false; });
+    this.container.appendChild(btn);
     return btn;
   }
 
   _buildSteering() {
-    const left = this._makeBtn('◀', 'bottom:30px;left:24px;');
-    const right = this._makeBtn('▶', 'bottom:30px;left:96px;');
-    this._bind(left, 'left');
-    this._bind(right, 'right');
-    this.container.appendChild(left);
-    this.container.appendChild(right);
+    this._addToggle('steerLeft', 'bottom:28px;left:20px;', 'left', 'rgba(20,20,24,0.62)');
+    this._addToggle('steerRight', 'bottom:28px;left:94px;', 'right', 'rgba(20,20,24,0.62)');
   }
 
   _buildPedals() {
-    const accel = this._makeBtn('▲', 'bottom:104px;right:24px;background:rgba(40,120,60,0.7);');
-    const brake = this._makeBtn('▼', 'bottom:30px;right:24px;background:rgba(150,40,40,0.7);');
-    this._bind(accel, 'accel');
-    this._bind(brake, 'brake');
-    this.container.appendChild(accel);
-    this.container.appendChild(brake);
+    this._addToggle('accelerate', 'bottom:100px;right:20px;', 'accel', 'rgba(40,130,65,0.75)');
+    this._addToggle('brake', 'bottom:28px;right:20px;', 'brake', 'rgba(155,40,40,0.75)');
   }
 
   _buildHandbrake() {
-    const hb = this._makeBtn('HB', 'bottom:104px;left:60px;width:48px;height:48px;font-size:12px;background:rgba(150,110,20,0.7);');
-    this._bind(hb, 'handbrake');
-    this.container.appendChild(hb);
+    this._addToggle('handbrake', 'bottom:100px;left:57px;', 'handbrake', 'rgba(160,115,20,0.75)');
+  }
+
+  _buildHorn() {
+    const horn = makeIconButton({ icon: 'horn', size: 44, bg: 'rgba(20,20,24,0.55)', extraStyle: 'top:54px;right:20px;' });
+    bindTapButton(horn, () => { if (this.onHorn) this.onHorn(); });
+    this.container.appendChild(horn);
   }
 
   consume() {

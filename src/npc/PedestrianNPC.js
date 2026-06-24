@@ -74,11 +74,20 @@ export class PedestrianNPC extends NPC {
                     : period === TIME_PERIOD.NIGHT     ? 0.45
                     : 1.0;
 
-    const allowed = period === TIME_PERIOD.MORNING
-      ? [ACTIVITY.WALK, ACTIVITY.WALK, ACTIVITY.IDLE]
-      : period === TIME_PERIOD.EVENING
-        ? [ACTIVITY.WALK, ACTIVITY.IDLE, ACTIVITY.IDLE]
-        : [ACTIVITY.WALK, ACTIVITY.IDLE, ACTIVITY.IDLE];
+    // scheduleType ('worker' vs 'casual') now actually drives behavior: workers spend
+    // daytime hours doing WORK, casual NPCs SHOP or EAT — previously this field was set
+    // at spawn but never read, so every NPC just walked or idled regardless of type.
+    const isDaytime = period === TIME_PERIOD.MORNING || period === TIME_PERIOD.AFTERNOON;
+    let allowed;
+    if (isDaytime && this.scheduleType === 'worker') {
+      allowed = [ACTIVITY.WALK, ACTIVITY.WORK, ACTIVITY.WORK, ACTIVITY.IDLE];
+    } else if (isDaytime && this.scheduleType === 'casual') {
+      allowed = [ACTIVITY.WALK, ACTIVITY.SHOP, ACTIVITY.EAT, ACTIVITY.IDLE];
+    } else if (period === TIME_PERIOD.EVENING) {
+      allowed = [ACTIVITY.WALK, ACTIVITY.IDLE, ACTIVITY.IDLE, ACTIVITY.EAT];
+    } else {
+      allowed = [ACTIVITY.WALK, ACTIVITY.IDLE, ACTIVITY.IDLE];
+    }
 
     this.activity.update(dt, allowed);
 
@@ -96,6 +105,12 @@ export class PedestrianNPC extends NPC {
       }
 
       this.animator.update(dt, true);
+    } else if (this.activity.is(ACTIVITY.WORK)) {
+      this.animator.playWork(dt);
+    } else if (this.activity.is(ACTIVITY.SHOP)) {
+      this.animator.playShop(dt);
+    } else if (this.activity.is(ACTIVITY.EAT)) {
+      this.animator.playEat(dt);
     } else {
       this.animator.playIdle(dt);
     }

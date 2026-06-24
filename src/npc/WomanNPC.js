@@ -94,7 +94,12 @@ export class WomanNPC extends NPC {
                     : period === TIME_PERIOD.NIGHT     ? 0.4
                     : 0.9;
 
-    this.activity.update(dt, [ACTIVITY.WALK, ACTIVITY.IDLE, ACTIVITY.IDLE]);
+    const isDaytime = period === TIME_PERIOD.MORNING || period === TIME_PERIOD.AFTERNOON;
+    const allowed = isDaytime
+      ? [ACTIVITY.WALK, ACTIVITY.SHOP, ACTIVITY.SHOP, ACTIVITY.EAT, ACTIVITY.IDLE]
+      : [ACTIVITY.WALK, ACTIVITY.IDLE, ACTIVITY.IDLE];
+
+    this.activity.update(dt, allowed);
 
     if (this.activity.is(ACTIVITY.WALK)) {
       const speed = SETTINGS.npc.wanderSpeed * speedMult;
@@ -109,6 +114,10 @@ export class WomanNPC extends NPC {
         this.wanderAngle += (Math.random() - 0.5) * 1.0;
       }
       this.animator.update(dt, true);
+    } else if (this.activity.is(ACTIVITY.SHOP)) {
+      this.animator.playShop(dt);
+    } else if (this.activity.is(ACTIVITY.EAT)) {
+      this.animator.playEat(dt);
     } else {
       this.animator.playIdle(dt);
     }

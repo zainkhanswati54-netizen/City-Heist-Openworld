@@ -3,6 +3,8 @@
 // Right side: look/camera drag zone
 // Buttons:    Fire (bottom-right), Sprint toggle, Enter/Exit, Weapon cycle
 
+import { makeIconButton, bindHoldButton, bindTapButton } from './TouchIcons.js';
+
 export class TouchControls {
   constructor(root) {
     this.state = {
@@ -169,62 +171,26 @@ export class TouchControls {
   }
 
   _buildFireButton(root) {
-    const btn = document.createElement('div');
-    btn.innerHTML = '🔥';
-    btn.style.cssText = `
-      position:absolute;
-      bottom:28px;
-      right:20px;
-      width:88px;
-      height:88px;
-      border-radius:50%;
-      background:rgba(200,30,30,0.8);
-      color:#fff;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:30px;
-      font-weight:bold;
-      touch-action:none;
-      user-select:none;
-      border:3px solid rgba(255,100,100,0.7);
-      box-shadow:0 0 20px rgba(255,0,0,0.5);
-      pointer-events:auto;
-    `;
-    btn.addEventListener('touchstart',  e => { this.state.firing = true;  e.preventDefault(); }, { passive: false });
-    btn.addEventListener('touchend',    () => { this.state.firing = false; });
-    btn.addEventListener('touchcancel', () => { this.state.firing = false; });
-    btn.addEventListener('mousedown',   () => { this.state.firing = true;  });
-    btn.addEventListener('mouseup',     () => { this.state.firing = false; });
+    const btn = makeIconButton({
+      icon: 'fire',
+      size: 88,
+      bg: 'rgba(200,30,30,0.8)',
+      borderColor: 'rgba(255,100,100,0.7)',
+      extraStyle: 'bottom:28px;right:20px;box-shadow:0 0 20px rgba(255,0,0,0.5);'
+    });
+    bindHoldButton(btn, () => { this.state.firing = true; }, () => { this.state.firing = false; });
     root.appendChild(btn);
   }
 
   _buildSprintButton(root) {
-    const btn = document.createElement('div');
-    btn.textContent = '⚡';
-    btn.style.cssText = `
-      position:absolute;
-      bottom:130px;
-      right:26px;
-      width:58px;
-      height:58px;
-      border-radius:50%;
-      background:rgba(255,165,0,0.75);
-      color:#fff;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:22px;
-      touch-action:none;
-      user-select:none;
-      border:2px solid rgba(255,200,50,0.8);
-      pointer-events:auto;
-    `;
-    btn.addEventListener('touchstart',  e => { this.state.sprinting = true;  e.preventDefault(); }, { passive: false });
-    btn.addEventListener('touchend',    () => { this.state.sprinting = false; });
-    btn.addEventListener('touchcancel', () => { this.state.sprinting = false; });
-    btn.addEventListener('mousedown',   () => { this.state.sprinting = true;  });
-    btn.addEventListener('mouseup',     () => { this.state.sprinting = false; });
+    const btn = makeIconButton({
+      icon: 'sprint',
+      size: 58,
+      bg: 'rgba(200,130,0,0.75)',
+      borderColor: 'rgba(255,200,50,0.8)',
+      extraStyle: 'bottom:130px;right:26px;'
+    });
+    bindHoldButton(btn, () => { this.state.sprinting = true; }, () => { this.state.sprinting = false; });
     root.appendChild(btn);
   }
 
@@ -233,37 +199,19 @@ export class TouchControls {
     wrap.style.cssText = 'position:absolute;top:80px;right:16px;display:flex;flex-direction:column;gap:10px;align-items:center;pointer-events:auto;';
     root.appendChild(wrap);
 
-    const enterBtn = this._makeActionBtn('E', '#00aabb', '🚗');
-    enterBtn.addEventListener('click', () => { this.state.enterExitPressed = true; });
+    const enterBtn = makeIconButton({ icon: 'enterCar', size: 54, bg: 'rgba(0,150,170,0.75)' });
+    bindTapButton(enterBtn, () => { this.state.enterExitPressed = true; });
 
-    const weaponBtn = this._makeActionBtn('W', '#aa7700', '🔫');
-    weaponBtn.addEventListener('click', () => { this.state.weaponCyclePressed = true; });
+    const weaponBtn = makeIconButton({ icon: 'weaponCycle', size: 54, bg: 'rgba(170,120,0,0.75)' });
+    bindTapButton(weaponBtn, () => { this.state.weaponCyclePressed = true; });
+
+    // Buttons created via makeIconButton are absolutely positioned by default (for the
+    // driving D-pad's free-floating layout); here we want them stacked in a flex column,
+    // so clear that positioning and let the flex wrapper handle placement instead.
+    [enterBtn, weaponBtn].forEach(b => { b.style.position = 'relative'; });
 
     wrap.appendChild(enterBtn);
     wrap.appendChild(weaponBtn);
-  }
-
-  _makeActionBtn(label, color, icon) {
-    const btn = document.createElement('div');
-    btn.innerHTML = `<span style="font-size:18px">${icon}</span><span style="font-size:10px;display:block;margin-top:2px">${label}</span>`;
-    btn.style.cssText = `
-      width:54px;
-      height:54px;
-      border-radius:12px;
-      background:${color}cc;
-      color:#fff;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      font-family:monospace;
-      font-weight:bold;
-      touch-action:none;
-      user-select:none;
-      border:2px solid rgba(255,255,255,0.45);
-      box-shadow:0 2px 8px rgba(0,0,0,0.4);
-    `;
-    return btn;
   }
 
   consumePressFlags() {

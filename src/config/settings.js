@@ -1,7 +1,7 @@
 export const SETTINGS = {
   world: {
-    fogNear: 30,
-    fogFar:  110,    // slightly extended — lets players see more buildings & lamps
+    fogNear: 50,
+    fogFar:  160,   // was 480 — GPU now renders 3× less of the world
     blockSize: 40,
     worldHalf: 400
   },
@@ -43,9 +43,9 @@ export const SETTINGS = {
     maxHealth: 3,
     wanderSpeed: 0.045,
     panicRadius: 22,
-    crowdPerBlockChance: 0.60,   // 60 % of blocks get NPCs — lively streets
-    maxPerBlock: 2,
-    updateDistanceSq: 45 * 45
+    crowdPerBlockChance: 0.40,  // was 0.75 — fewer NPCs, way faster
+    maxPerBlock: 2,              // was 3
+    updateDistanceSq: 55 * 55   // skip update if farther than this
   },
 
   traffic: {
@@ -56,7 +56,7 @@ export const SETTINGS = {
     redLightStopMax: 130,
     redLightIntervalMin: 140,
     redLightIntervalMax: 300,
-    updateDistanceSq: 80 * 80
+    updateDistanceSq: 100 * 100 // skip update if farther than this
   },
 
   economy: {

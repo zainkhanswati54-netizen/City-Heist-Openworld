@@ -98,8 +98,8 @@ export class ElderNPC extends NPC {
                     : period === TIME_PERIOD.AFTERNOON ? 0.45
                     : 0.35;
 
-    // Elders prefer idling over walking
-    this.activity.update(dt, [ACTIVITY.IDLE, ACTIVITY.IDLE, ACTIVITY.WALK]);
+    // Elders prefer idling over walking, with occasional eating (sitting with a snack)
+    this.activity.update(dt, [ACTIVITY.IDLE, ACTIVITY.IDLE, ACTIVITY.EAT, ACTIVITY.WALK]);
 
     if (this.activity.is(ACTIVITY.WALK)) {
       const speed = SETTINGS.npc.wanderSpeed * speedMult;
@@ -114,6 +114,8 @@ export class ElderNPC extends NPC {
         this.wanderAngle += (Math.random() - 0.5) * 0.7;
       }
       this.animator.update(dt, true);
+    } else if (this.activity.is(ACTIVITY.EAT)) {
+      this.animator.playEat(dt);
     } else {
       this.animator.playIdle(dt);
     }

@@ -27,10 +27,14 @@ export class PlayerCamera {
 
   follow(target) {
     const view = SETTINGS.camera.views[this.viewName];
+    // Camera sits behind the player relative to forward = (-sin(yaw), -cos(yaw)) —
+    // i.e. on the opposite side from forward, so it looks toward where forward points.
+    // (Previously this used (+sin, +cos), which put the camera on the wrong side and
+    // made pressing W visually move the player away from the camera — backward.)
     const offset = new THREE.Vector3(
-      -Math.sin(this.yaw) * Math.cos(this.pitch) * view.distance,
+      Math.sin(this.yaw) * Math.cos(this.pitch) * view.distance,
       view.height + Math.sin(this.pitch) * 5,
-      -Math.cos(this.yaw) * Math.cos(this.pitch) * view.distance
+      Math.cos(this.yaw) * Math.cos(this.pitch) * view.distance
     );
     const desired = target.clone().add(offset);
     this.camera.position.lerp(desired, SETTINGS.camera.lerp);

@@ -16,11 +16,10 @@ export class CarPhysics {
 
     this.speed = Math.sqrt(this.vx * this.vx + this.vz * this.vz);
 
-    // Determine if we're currently moving forward or backward relative to facing angle,
-    // so steering feels correct in reverse (turning the wheel left while reversing
-    // should swing the rear the opposite way visually, same as real driving).
-    const facingX = Math.sin(this.angle);
-    const facingZ = Math.cos(this.angle);
+    // Facing direction now matches the corrected camera convention: forward = (-sin, -cos),
+    // consistent with PlayerController and the fixed PlayerCamera.follow() offset.
+    const facingX = -Math.sin(this.angle);
+    const facingZ = -Math.cos(this.angle);
     const movingForward = (this.vx * facingX + this.vz * facingZ) >= 0;
     const steerDirection = movingForward ? 1 : -1;
 
@@ -28,8 +27,8 @@ export class CarPhysics {
     if (input.left) this.angle += cfg.steerRate * steerFactor * steerDirection * dt;
     if (input.right) this.angle -= cfg.steerRate * steerFactor * steerDirection * dt;
 
-    this.vx += Math.sin(this.angle) * accel * dt;
-    this.vz += Math.cos(this.angle) * accel * dt;
+    this.vx += facingX * accel * dt;
+    this.vz += facingZ * accel * dt;
 
     let frictionFactor = cfg.friction;
     if (input.handbrake) frictionFactor = cfg.handbrakeFriction;

@@ -1,29 +1,38 @@
 import * as THREE from 'three';
+import { standardMaterial } from '../utils/MaterialFactory.js';
 import { randomVariant } from '../utils/ColorUtils.js';
 import { PALETTE } from '../config/colors.js';
 import { pick } from '../utils/RandomUtils.js';
 
-// TWO draw calls per tree: 1 trunk cylinder + 1 cone for leaves.
-// No shadows, no extra clusters.  Previously 4+ meshes with shadows.
-const _trunkMat = new THREE.MeshLambertMaterial({ color: 0x5a3a1a });
-const _leafMats  = [0x2d6a30, 0x3a7a3e, 0x256028, 0x1e5225].map(
-  c => new THREE.MeshLambertMaterial({ color: c })
-);
-
+// Trees deliberately do NOT cast shadows — they are numerous (~180+) and
+// the shadow contribution is barely visible.  Removing castShadow from
+// trees alone eliminates ~700 shadow-caster calls per frame.
 export class Tree {
   constructor(x, z) {
     this.group = new THREE.Group();
 
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 2.4, 5), _trunkMat);
-    trunk.position.y = 1.2;
+    const trunkMat = standardMaterial(PALETTE.treeTrunk, { roughness: 0.95 });
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.28, 2.2, 6), trunkMat);
+    trunk.position.y = 1.1;
+    trunk.receiveShadow = true;
     this.group.add(trunk);
 
-    const leafMat = _leafMats[Math.floor(Math.random() * _leafMats.length)];
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(1.5, 3.8, 6), leafMat);
-    cone.position.y = 4.5;
-    this.group.add(cone);
+    const leafColor = randomVariant(pick(PALETTE.treeLeaves), 0.06);
+    const leafMat = standardMaterial(leafColor, { roughness: 0.9 });
+
+    const clusters = [
+      { y: 3.0, r: 1.3 },
+      { y: 3.9, r: 1.0 },
+      { y: 4.5, r: 0.65 }
+    ];
+    clusters.forEach(c => {
+      const cluster = new THREE.Mesh(new THREE.SphereGeometry(c.r, 6, 5), leafMat);
+      cluster.position.set((Math.random() - 0.5) * 0.3, c.y, (Math.random() - 0.5) * 0.3);
+      cluster.receiveShadow = true;
+      this.group.add(cluster);
+    });
 
     this.group.position.set(x, 0, z);
-    this.group.scale.setScalar(0.8 + Math.random() * 0.4);
+    this.group.scale.setScalar(0.85 + Math.random() * 0.4);
   }
 }

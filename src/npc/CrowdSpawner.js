@@ -20,29 +20,19 @@ export class CrowdSpawner {
   static spawnAcrossBlocks(scene, blocks, perBlockChance, maxPerBlock) {
     const pbc = perBlockChance ?? SETTINGS.npc.crowdPerBlockChance;
     const mpb = maxPerBlock  ?? SETTINGS.npc.maxPerBlock;
-    const pedestrians  = [];
+    const pedestrians = [];
     const talkingPairs = [];
 
     blocks.forEach(block => {
       if (block.type === 'park') return;
       if (Math.random() > pbc) return;
 
-      // 45 % chance of a talking pair — makes streets feel social
-      if (chance(0.45)) {
+      if (chance(0.22)) {
         const angle = Math.random() * Math.PI * 2;
         const pair = new TalkingNPCPair(block.x, block.z, angle);
         pair.npcs.forEach(n => scene.add(n.group));
         talkingPairs.push(pair);
         pedestrians.push(...pair.npcs);
-
-        // Sometimes add a solo NPC standing nearby (street corner trio)
-        if (chance(0.35)) {
-          const ox = block.x + (Math.random() - 0.5) * 4;
-          const oz = block.z + (Math.random() - 0.5) * 4;
-          const extra = spawnRandomNPC(ox, oz);
-          scene.add(extra.group);
-          pedestrians.push(extra);
-        }
         return;
       }
 
@@ -70,15 +60,15 @@ export class CrowdSpawner {
     return sitters;
   }
 
-  static spawnBeachCrowd(scene, bounds, count) {
-    const crowd = [];
+  static spawnBeachCrowd(scene, bounds, count = 22) {
+    const npcs = [];
     for (let i = 0; i < count; i++) {
-      const bx = bounds.xMin + Math.random() * (bounds.xMax - bounds.xMin);
-      const bz = bounds.zMin + Math.random() * (bounds.zMax - bounds.zMin);
-      const npc = new BeachNPC(bx, bz);
+      const x = bounds.xMin + 15 + Math.random() * (bounds.xMax - bounds.xMin - 30);
+      const z = bounds.zMax - 10 - Math.random() * 35;
+      const npc = new BeachNPC(x, z);
       scene.add(npc.group);
-      crowd.push(npc);
+      npcs.push(npc);
     }
-    return crowd;
+    return npcs;
   }
 }

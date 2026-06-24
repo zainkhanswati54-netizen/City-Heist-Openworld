@@ -41,7 +41,11 @@ export class Car {
     const result = this.physics.step(input, collisionCheck, this.group.position.x, this.group.position.z, dt);
     this.group.position.x = result.x;
     this.group.position.z = result.z;
-    this.group.rotation.y = this.physics.angle;
+    // The car model's headlights/front face local +Z at rotation.y=0, but physics.angle
+    // now represents facing = (-sin(angle), -cos(angle)) [world -Z at angle=0] after the
+    // forward-direction sign fix — so the mesh needs a 180° offset to visually point
+    // the way it's actually accelerating, otherwise it would appear to drive backward.
+    this.group.rotation.y = this.physics.angle + Math.PI;
 
     const wheelSpin = this.physics.speed * 2.2 * dt;
     this.wheels.forEach(w => w.spin(wheelSpin));

@@ -10,26 +10,27 @@ export class Engine {
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: false,          // AA is expensive — always off
-      powerPreference: 'high-performance',
-      precision: 'mediump'       // medium precision = faster on mobile
+      antialias: !mobile,           // no AA on mobile — huge GPU win
+      powerPreference: 'high-performance'
     });
 
-    // Aggressive pixel ratio cap: 1 on mobile, 1.25 on desktop max
-    this.renderer.setPixelRatio(mobile ? 1 : Math.min(window.devicePixelRatio, 1.25));
+    // Cap pixel ratio: 1 on mobile, 1.5 on desktop (not 2)
+    this.renderer.setPixelRatio(mobile ? 1 : Math.min(window.devicePixelRatio, 1.5));
 
-    // SHADOWS OFF — the shadow pass alone can cost 5–10ms per frame
-    this.renderer.shadowMap.enabled = false;
+    // PCFShadowMap is ~2× faster than PCFSoftShadowMap
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.NoToneMapping; // NoToneMapping = fastest
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.1;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(PALETTE.sky.day);
     this.scene.fog = new THREE.Fog(PALETTE.fogDay, SETTINGS.world.fogNear, SETTINGS.world.fogFar);
 
-    // Tight far plane: nothing visible beyond fog anyway
-    this.camera = new THREE.PerspectiveCamera(SETTINGS.camera.views.far.fov, 1, 0.5, 200);
+    // Near/far: 0.5–300 is enough for this world, keeps depth buffer precision high
+    this.camera = new THREE.PerspectiveCamera(SETTINGS.camera.views.far.fov, 1, 0.5, 350);
     this.camera.position.set(0, 8, 14);
 
     this._resizeListeners = [];

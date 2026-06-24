@@ -12,6 +12,7 @@ import { standardMaterial } from '../utils/MaterialFactory.js';
 import { randInt, chance, pick } from '../utils/RandomUtils.js';
 import { applyShadowCasting } from '../lighting/ShadowConfig.js';
 import { PALETTE } from '../config/colors.js';
+import { StreetLamp } from '../lighting/StreetLamp.js';
 
 export class DistrictManager {
   constructor(scene, windowGrid) {
@@ -21,6 +22,7 @@ export class DistrictManager {
     this.suburbBuildings = [];
     this.oceans = [];
     this.beachProps = [];
+    this.districtLamps = []; // street lamps placed in beach/suburb districts (city's own lamps are tracked separately in CityBuilder)
   }
 
   buildBeach() {
@@ -53,6 +55,16 @@ export class DistrictManager {
       this.scene.add(BeachProp.lounger(x + 1.2, z + 1.0, Math.PI / 2));
       if (chance(0.5)) this.scene.add(BeachProp.beachBall(x - 1.5, z + 2));
     }
+
+    // Boardwalk-style lamps along the shoreline so the beach isn't pitch dark at night,
+    // matching the same fix applied to the suburb district below.
+    for (let i = 0; i < 10; i++) {
+      const x = bounds.xMin + 8 + Math.random() * (bounds.xMax - bounds.xMin - 16);
+      const z = shoreZ - 2 - Math.random() * 28;
+      const lamp = new StreetLamp(x, z);
+      this.scene.add(lamp.group);
+      this.districtLamps.push(lamp);
+    }
   }
 
   buildMountains() {
@@ -78,10 +90,10 @@ export class DistrictManager {
 
   buildSuburbs() {
     const bounds = DISTRICT_LAYOUT.suburbBounds;
-    const spacing = 26;
+    const spacing = 22; // tighter than before (was 26) for more buildings per the density request
     for (let x = bounds.xMin + 20; x < bounds.xMax - 10; x += spacing) {
       for (let z = bounds.zMin + 20; z < bounds.zMax - 10; z += spacing) {
-        if (!chance(0.55)) continue;
+        if (!chance(0.68)) continue; // was 0.55 — denser suburb, less empty space
         const w = randInt(6, 9);
         const d = randInt(6, 9);
         const h = randInt(5, 10);
@@ -92,6 +104,14 @@ export class DistrictManager {
         this.windowGrid.applyToFace(building.group, d, h, w, w / 2 + 0.02, 'x');
         this.scene.add(building.group);
         this.suburbBuildings.push({ mesh: building.group, x, z, w, d });
+
+        // One lamp near roughly every third building, so the suburb has visible
+        // night lighting without looking like a lamp farm.
+        if (chance(0.33)) {
+          const lamp = new StreetLamp(x + w / 2 + 2, z - d / 2 - 2);
+          this.scene.add(lamp.group);
+          this.districtLamps.push(lamp);
+        }
       }
     }
   }
@@ -117,8 +137,9 @@ export class DistrictManager {
     });
   }
 
-  update(dt) {
+  update(dt, isNight) {
     this.oceans.forEach(o => o.update(dt));
+    this.districtLamps.forEach(lamp => lamp.setNight(isNight));
   }
 
   getDistrict(x, z) {
